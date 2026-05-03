@@ -1,0 +1,140 @@
+.back {
+  display: inline-block;
+  color: var(--color-text-muted);
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.back:hover {
+  color: var(--color-primary-hover);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 480px) 1fr;
+  gap: 32px;
+  align-items: start;
+}
+
+.imageBox {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.image {
+  width: 60%;
+  height: 60%;
+  object-fit: contain;
+}
+
+.badgeOos {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  padding: 6px 14px;
+  background: var(--color-text);
+  color: white;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.category {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.name {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.sku {
+  font-size: 13px;
+  color: var(--color-text-subtle);
+}
+
+.priceRow {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin: 12px 0;
+}
+
+.price {
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.stockOk {
+  color: var(--color-success);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.stockOos {
+  color: var(--color-danger);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.specsTitle {
+  margin-top: 12px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.specs {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  row-gap: 8px;
+  font-size: 14px;
+}
+
+.specs dt {
+  color: var(--color-text-muted);
+}
+
+.specs dd {
+  color: var(--color-text);
+  margin: 0;
+}
+
+.description {
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 800px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .specs {
+    grid-template-columns: 160px 1fr;
+  }
+}
