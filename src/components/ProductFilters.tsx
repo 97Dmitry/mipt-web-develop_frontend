@@ -1,20 +1,24 @@
-import type { BaseType, Category, ProductFilters, SortOption } from '../types/domain';
+import type { BaseType, Category, ProductFiltersQuery, SortOption } from '../types/domain';
 import { Select } from './ui/Select';
 import { Checkbox } from './ui/Checkbox';
 import { Input } from './ui/Input';
 import { Button } from './ui/Button';
 import styles from './ProductFilters.module.css';
 
+export interface UiFilters extends Omit<ProductFiltersQuery, 'sortBy' | 'sortDir' | 'page' | 'limit'> {
+  sortOption?: SortOption;
+}
+
 interface ProductFiltersProps {
   categories: Category[];
-  filters: ProductFilters;
-  onChange: (next: ProductFilters) => void;
+  filters: UiFilters;
+  onChange: (next: UiFilters) => void;
   onReset: () => void;
 }
 
-const BASE_TYPES: BaseType[] = ['E27', 'E14', 'GU10', 'G9', 'G4'];
+const BASE_TYPES: BaseType[] = ['E27', 'E14', 'GU10', 'GX53'];
 const WATTAGES = [5, 6, 7, 9, 11, 12, 15, 20, 40, 50, 60, 95];
-const TEMPERATURES = [2700, 4000, 6500];
+const TEMPERATURES = [2700, 3000, 4000, 5000, 6500];
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: 'priceAsc', label: 'Сначала дешёвые' },
@@ -28,7 +32,7 @@ export function ProductFiltersPanel({
   onChange,
   onReset,
 }: ProductFiltersProps) {
-  const update = (patch: Partial<ProductFilters>) => onChange({ ...filters, ...patch });
+  const update = (patch: Partial<UiFilters>) => onChange({ ...filters, ...patch });
 
   return (
     <aside className={styles.panel}>
@@ -49,9 +53,11 @@ export function ProductFiltersPanel({
       <Select
         label="Категория"
         placeholder="Все"
-        value={filters.categoryId ?? ''}
-        options={categories.map((c) => ({ value: c.id, label: c.name }))}
-        onChange={(e) => update({ categoryId: e.target.value || undefined })}
+        value={filters.categoryId !== undefined ? String(filters.categoryId) : ''}
+        options={categories.map((c) => ({ value: String(c.id), label: c.name }))}
+        onChange={(e) =>
+          update({ categoryId: e.target.value ? Number(e.target.value) : undefined })
+        }
       />
 
       <Select
@@ -103,10 +109,10 @@ export function ProductFiltersPanel({
       <Select
         label="Сортировка"
         placeholder="По умолчанию"
-        value={filters.sortBy ?? ''}
+        value={filters.sortOption ?? ''}
         options={SORT_OPTIONS}
         onChange={(e) =>
-          update({ sortBy: (e.target.value as SortOption) || undefined })
+          update({ sortOption: (e.target.value as SortOption) || undefined })
         }
       />
     </aside>

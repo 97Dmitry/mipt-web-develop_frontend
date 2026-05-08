@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { DeliveryType } from '../types/domain';
-import { useCart } from '../context/useCart';
-import { createOrder } from '../api/orders';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { createOrder, resetCreateStatus } from '../store/slices/orderSlice';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Textarea } from '../components/ui/Textarea';
@@ -36,19 +36,31 @@ const INITIAL: FormState = {
 };
 
 export function CheckoutPage() {
-  const { lines, totalItems, totalPriceMinor, clear } = useCart();
+  const dispatch = useAppDispatch();
   const navigate = useNavigate();
+
+  const items = useAppSelector((s) => s.cart.items ?? []);
+  const total = useAppSelector((s) => s.cart.total);
+  const sessionId = useAppSelector((s) => s.cart.sessionId);
+  const createStatus = useAppSelector((s) => s.order.createStatus);
+  const createError = useAppSelector((s) => s.order.createError);
 
   const [form, setForm] = useState<FormState>(INITIAL);
   const [errors, setErrors] = useState<FormErrors>({});
-  const [submitting, setSubmitting] = useState(false);
-  const [serverError, setServerError] = useState<string | null>(null);
+
+  const submitting = createStatus === 'submitting';
 
   useEffect(() => {
-    if (lines.length === 0 && !submitting) {
+    return () => {
+      dispatch(resetCreateStatus());
+    };
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (items.length === 0 && !submitting && createStatus !== 'success') {
       navigate('/cart', { replace: true });
     }
-  }, [lines.length, submitting, navigate]);
+  }, [items.length, submitting, createStatus, navigate]);
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -67,35 +79,49 @@ export function CheckoutPage() {
     return next;
   };
 
+  const totalItems = items.reduce((sum, l) => sum + l.qty, 0);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const v = validate();
     setErrors(v);
     if (Object.keys(v).length > 0) return;
 
-    setSubmitting(true);
-    setServerError(null);
-    try {
-      const order = await createOrder({
+    const result = await dispatch(
+      createOrder({
+        sessionId,
         customerName: form.customerName.trim(),
         phone: form.phone.trim(),
         email: form.email.trim(),
         deliveryType: form.deliveryType,
         address: form.deliveryType === 'courier' ? form.address.trim() : undefined,
         comment: form.comment.trim() || undefined,
-        items: lines.map((l) => ({ productId: l.product.id, qty: l.qty })),
-      });
-      clear();
-      navigate(`/orders/${order.id}`, { replace: true });
-    } catch (err) {
-      setServerError(err instanceof Error ? err.message : 'Не удалось оформить заказ');
-      setSubmitting(false);
+      }),
+    );
+
+    if (createOrder.fulfilled.match(result)) {
+      navigate(`/orders/${result.payload.id}`, { replace: true });
+      return;
+    }
+
+    if (createOrder.rejected.match(result)) {
+      const payload = result.payload;
+      if (payload?.code === 'ADDRESS_REQUIRED') {
+        setErrors((prev) => ({ ...prev, address: payload.message ?? 'Укажите адрес доставки' }));
+      } else if (payload?.code === 'EMPTY_CART') {
+        navigate('/cart', { replace: true });
+      }
     }
   };
 
-  if (lines.length === 0) {
+  if (items.length === 0 && createStatus !== 'success') {
     return null;
   }
+
+  const serverErrorText =
+    createError && createError.code !== 'ADDRESS_REQUIRED'
+      ? createError.message
+      : null;
 
   return (
     <div className="container">
@@ -190,19 +216,19 @@ export function CheckoutPage() {
             />
           </section>
 
-          {serverError && <div className={styles.serverError}>{serverError}</div>}
+          {serverErrorText && <div className={styles.serverError}>{serverErrorText}</div>}
         </div>
 
         <aside className={styles.summary}>
           <h3 className={styles.summaryTitle}>Ваш заказ</h3>
           <ul className={styles.itemsList}>
-            {lines.map(({ product, qty, lineTotalMinor }) => (
-              <li key={product.id} className={styles.summaryItem}>
+            {items.map((line) => (
+              <li key={line.id} className={styles.summaryItem}>
                 <div className={styles.itemName}>
-                  {product.name}
-                  <span className={styles.itemQty}> × {qty}</span>
+                  {line.productName}
+                  <span className={styles.itemQty}> × {line.qty}</span>
                 </div>
-                <div className={styles.itemTotal}>{formatPrice(lineTotalMinor)}</div>
+                <div className={styles.itemTotal}>{formatPrice(line.lineTotal)}</div>
               </li>
             ))}
           </ul>
@@ -213,7 +239,7 @@ export function CheckoutPage() {
           </div>
           <div className={styles.summaryRow}>
             <span className="muted">Итого</span>
-            <span className={styles.summaryTotal}>{formatPrice(totalPriceMinor)}</span>
+            <span className={styles.summaryTotal}>{formatPrice(total)}</span>
           </div>
           <Button type="submit" fullWidth size="lg" disabled={submitting}>
             {submitting ? 'Отправка…' : 'Оформить заказ'}

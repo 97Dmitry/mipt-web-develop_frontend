@@ -1,24 +1,34 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import type { BaseType, Category, Product, ProductFilters, SortOption } from '../types/domain';
-import { getCategories, getProducts } from '../api/products';
+import type {
+  BaseType,
+  ProductFiltersQuery,
+  SortBy,
+  SortDir,
+  SortOption,
+} from '../types/domain';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { fetchCategories, fetchProducts } from '../store/slices/productsSlice';
 import { ProductCard } from '../components/ProductCard';
 import { ProductFiltersPanel } from '../components/ProductFilters';
+import type { UiFilters } from '../components/ProductFilters';
 import { EmptyState } from '../components/EmptyState';
 import { Button } from '../components/ui/Button';
 import styles from './CatalogPage.module.css';
 
-const BASE_TYPES_SET = new Set<BaseType>(['E27', 'E14', 'GU10', 'G9', 'G4']);
+const BASE_TYPES_SET = new Set<BaseType>(['E27', 'E14', 'GU10', 'GX53']);
 const SORT_SET = new Set<SortOption>(['priceAsc', 'priceDesc', 'nameAsc']);
 
-function parseFiltersFromSearch(params: URLSearchParams): ProductFilters {
-  const filters: ProductFilters = {};
+function parseFiltersFromSearch(params: URLSearchParams): UiFilters {
+  const filters: UiFilters = {};
 
   const search = params.get('search');
   if (search) filters.search = search;
 
   const categoryId = params.get('categoryId');
-  if (categoryId) filters.categoryId = categoryId;
+  if (categoryId && !Number.isNaN(Number(categoryId))) {
+    filters.categoryId = Number(categoryId);
+  }
 
   const baseType = params.get('baseType');
   if (baseType && BASE_TYPES_SET.has(baseType as BaseType)) {
@@ -41,68 +51,88 @@ function parseFiltersFromSearch(params: URLSearchParams): ProductFilters {
 
   const sortBy = params.get('sortBy');
   if (sortBy && SORT_SET.has(sortBy as SortOption)) {
-    filters.sortBy = sortBy as SortOption;
+    filters.sortOption = sortBy as SortOption;
   }
 
   return filters;
 }
 
-function filtersToSearchInit(filters: ProductFilters): URLSearchParams {
+function filtersToSearch(filters: UiFilters): URLSearchParams {
   const params = new URLSearchParams();
   if (filters.search) params.set('search', filters.search);
-  if (filters.categoryId) params.set('categoryId', filters.categoryId);
+  if (filters.categoryId !== undefined) params.set('categoryId', String(filters.categoryId));
   if (filters.baseType) params.set('baseType', filters.baseType);
   if (filters.wattage !== undefined) params.set('wattage', String(filters.wattage));
   if (filters.colorTemperatureK !== undefined)
     params.set('colorTemperatureK', String(filters.colorTemperatureK));
   if (filters.inStock) params.set('inStock', '1');
-  if (filters.sortBy) params.set('sortBy', filters.sortBy);
+  if (filters.sortOption) params.set('sortBy', filters.sortOption);
   return params;
+}
+
+function sortOptionToQuery(option: SortOption | undefined): {
+  sortBy?: SortBy;
+  sortDir?: SortDir;
+} {
+  switch (option) {
+    case 'priceAsc':
+      return { sortBy: 'price', sortDir: 'asc' };
+    case 'priceDesc':
+      return { sortBy: 'price', sortDir: 'desc' };
+    case 'nameAsc':
+      return { sortBy: 'name', sortDir: 'asc' };
+    default:
+      return {};
+  }
+}
+
+function uiFiltersToQuery(filters: UiFilters): ProductFiltersQuery {
+  const { sortOption, ...rest } = filters;
+  return { ...rest, ...sortOptionToQuery(sortOption), limit: 24 };
 }
 
 export function CatalogPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [items, setItems] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const dispatch = useAppDispatch();
+  const categories = useAppSelector((s) => s.products.categories);
+  const list = useAppSelector((s) => s.products.list);
+  const meta = useAppSelector((s) => s.products.listMeta);
+  const status = useAppSelector((s) => s.products.listStatus);
+  const error = useAppSelector((s) => s.products.listError);
 
   const filters = useMemo(() => parseFiltersFromSearch(searchParams), [searchParams]);
+  const queryString = searchParams.toString();
 
   useEffect(() => {
-    let cancelled = false;
-    getCategories().then((cats) => {
-      if (!cancelled) setCategories(cats);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    dispatch(fetchCategories());
+  }, [dispatch]);
 
   useEffect(() => {
-    let cancelled = false;
-    getProducts(filters).then((list) => {
-      if (cancelled) return;
-      setItems(list);
-      setLoading(false);
-    });
+    const promise = dispatch(fetchProducts(uiFiltersToQuery(filters)));
     return () => {
-      cancelled = true;
+      promise.abort();
     };
-  }, [filters]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispatch, queryString]);
 
-  const handleFiltersChange = (next: ProductFilters) => {
-    setSearchParams(filtersToSearchInit(next), { replace: true });
+  const handleFiltersChange = (next: UiFilters) => {
+    setSearchParams(filtersToSearch(next), { replace: true });
   };
 
   const handleReset = () => {
     setSearchParams(new URLSearchParams(), { replace: true });
   };
 
+  const loading = status === 'loading' || status === 'idle';
+  const total = meta?.total ?? list.length;
+
   return (
     <div className="container">
       <div className={styles.header}>
         <h1>Каталог</h1>
-        <div className={styles.count}>{loading ? 'Загрузка…' : `Найдено: ${items.length}`}</div>
+        <div className={styles.count}>
+          {loading ? 'Загрузка…' : `Найдено: ${total}`}
+        </div>
       </div>
 
       <div className={styles.layout}>
@@ -114,7 +144,20 @@ export function CatalogPage() {
         />
 
         <div className={styles.results}>
-          {!loading && items.length === 0 && (
+          {status === 'error' && (
+            <EmptyState
+              icon="⚠️"
+              title="Не удалось загрузить каталог"
+              description={error?.message ?? 'Проверьте подключение и повторите попытку.'}
+              action={
+                <Button onClick={() => dispatch(fetchProducts(uiFiltersToQuery(filters)))}>
+                  Повторить
+                </Button>
+              }
+            />
+          )}
+
+          {status === 'success' && list.length === 0 && (
             <EmptyState
               title="Ничего не найдено"
               description="Попробуйте изменить параметры поиска или сбросить фильтры."
@@ -122,9 +165,9 @@ export function CatalogPage() {
             />
           )}
 
-          {items.length > 0 && (
+          {list.length > 0 && (
             <div className={styles.grid}>
-              {items.map((p) => (
+              {list.map((p) => (
                 <ProductCard key={p.id} product={p} />
               ))}
             </div>

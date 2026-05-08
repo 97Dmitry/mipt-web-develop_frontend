@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { Order } from '../types/domain';
-import { getOrderById } from '../api/orders';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { clearCurrentOrder, fetchOrderById } from '../store/slices/orderSlice';
 import { Button } from '../components/ui/Button';
 import { formatPrice } from '../utils/format';
 import styles from './OrderConfirmationPage.module.css';
@@ -22,31 +23,28 @@ const DELIVERY_LABELS: Record<Order['deliveryType'], string> = {
 
 export function OrderConfirmationPage() {
   const { orderId } = useParams<{ orderId: string }>();
-  const [order, setOrder] = useState<Order | null>(null);
-  const [loading, setLoading] = useState(true);
+  const dispatch = useAppDispatch();
+
+  const order = useAppSelector((s) => s.order.current);
+  const status = useAppSelector((s) => s.order.status);
+  const error = useAppSelector((s) => s.order.error);
+
+  const idAsNumber = Number(orderId);
+  const isValidId = orderId !== undefined && !Number.isNaN(idAsNumber);
 
   useEffect(() => {
-    if (!orderId) return;
-    let cancelled = false;
-    getOrderById(orderId).then((found) => {
-      if (cancelled) return;
-      setOrder(found);
-      setLoading(false);
-    });
+    if (!isValidId) return;
+    if (order && order.id === idAsNumber) return;
+    dispatch(fetchOrderById(idAsNumber));
+  }, [dispatch, isValidId, idAsNumber, order]);
+
+  useEffect(() => {
     return () => {
-      cancelled = true;
+      dispatch(clearCurrentOrder());
     };
-  }, [orderId]);
+  }, [dispatch]);
 
-  if (loading) {
-    return (
-      <div className="container">
-        <p>Загрузка…</p>
-      </div>
-    );
-  }
-
-  if (!order) {
+  if (!isValidId || status === 'notFound') {
     return (
       <div className="container">
         <h1>Заказ не найден</h1>
@@ -56,6 +54,31 @@ export function OrderConfirmationPage() {
         <Link to="/" style={{ marginTop: 16, display: 'inline-block' }}>
           ← Вернуться в каталог
         </Link>
+      </div>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <div className="container">
+        <h1>Не удалось загрузить заказ</h1>
+        <p className="muted" style={{ marginTop: 8 }}>
+          {error?.message ?? 'Проверьте подключение и повторите попытку.'}
+        </p>
+        <Button
+          style={{ marginTop: 16 }}
+          onClick={() => dispatch(fetchOrderById(idAsNumber))}
+        >
+          Повторить
+        </Button>
+      </div>
+    );
+  }
+
+  if (!order) {
+    return (
+      <div className="container">
+        <p>Загрузка…</p>
       </div>
     );
   }
@@ -87,9 +110,9 @@ export function OrderConfirmationPage() {
           <h2 className={styles.sectionTitle}>Состав заказа</h2>
           <ul className={styles.items}>
             {order.items.map((item) => (
-              <li key={item.productId} className={styles.item}>
+              <li key={item.id} className={styles.item}>
                 <div>
-                  <div className={styles.itemName}>{item.name}</div>
+                  <div className={styles.itemName}>{item.productName}</div>
                   <div className={styles.itemSpecs}>
                     {item.baseType} · {item.wattage} Вт · {item.colorTemperatureK}K · артикул{' '}
                     {item.sku}
@@ -97,16 +120,16 @@ export function OrderConfirmationPage() {
                 </div>
                 <div className={styles.itemRight}>
                   <div className={styles.itemQty}>
-                    {item.qty} × {formatPrice(item.unitPriceMinor)}
+                    {item.qty} × {formatPrice(item.unitPrice)}
                   </div>
-                  <div className={styles.itemTotal}>{formatPrice(item.lineTotalMinor)}</div>
+                  <div className={styles.itemTotal}>{formatPrice(item.lineTotal)}</div>
                 </div>
               </li>
             ))}
           </ul>
           <div className={styles.totalRow}>
             <span>Итого</span>
-            <span className={styles.totalAmount}>{formatPrice(order.totalMinor)}</span>
+            <span className={styles.totalAmount}>{formatPrice(order.total)}</span>
           </div>
         </section>
 

@@ -1,55 +1,42 @@
-import type { Category, Product, ProductFilters } from '../types/domain';
-import { categories } from '../data/categories';
-import { products } from '../data/products';
+import type { Category, PageMeta, Product, ProductFiltersQuery } from '../types/domain';
+import { request, requestEnvelope } from './client';
 
-export function getCategories(): Promise<Category[]> {
-  return Promise.resolve(categories.filter((c) => c.isActive).sort((a, b) => a.sortOrder - b.sortOrder));
+export function fetchCategories(signal?: AbortSignal): Promise<Category[]> {
+  return request<Category[]>('GET', 'product', '/categories', { signal });
 }
 
-export function getProductById(id: string): Promise<Product | null> {
-  return Promise.resolve(products.find((p) => p.id === id) ?? null);
+export interface ProductsListResult {
+  items: Product[];
+  meta: PageMeta;
 }
 
-export function getProducts(filters: ProductFilters = {}): Promise<Product[]> {
-  let result = products.filter((p) => p.isActive);
+export async function fetchProducts(
+  filters: ProductFiltersQuery,
+  signal?: AbortSignal,
+): Promise<ProductsListResult> {
+  const envelope = await requestEnvelope<Product[]>('GET', 'product', '/products', {
+    query: {
+      search: filters.search,
+      categoryId: filters.categoryId,
+      baseType: filters.baseType,
+      wattage: filters.wattage,
+      colorTemperatureK: filters.colorTemperatureK,
+      inStock: filters.inStock,
+      sortBy: filters.sortBy,
+      sortDir: filters.sortDir,
+      page: filters.page,
+      limit: filters.limit,
+    },
+    signal,
+  });
+  const meta = (envelope.meta as PageMeta | undefined) ?? {
+    page: 1,
+    limit: envelope.data.length,
+    total: envelope.data.length,
+  };
+  return { items: envelope.data, meta };
+}
 
-  if (filters.search) {
-    const q = filters.search.trim().toLowerCase();
-    if (q) {
-      result = result.filter(
-        (p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q),
-      );
-    }
-  }
-  if (filters.categoryId) {
-    result = result.filter((p) => p.categoryId === filters.categoryId);
-  }
-  if (filters.baseType) {
-    result = result.filter((p) => p.baseType === filters.baseType);
-  }
-  if (filters.wattage !== undefined) {
-    result = result.filter((p) => p.wattage === filters.wattage);
-  }
-  if (filters.colorTemperatureK !== undefined) {
-    result = result.filter((p) => p.colorTemperatureK === filters.colorTemperatureK);
-  }
-  if (filters.inStock) {
-    result = result.filter((p) => p.stockQty > 0);
-  }
-
-  switch (filters.sortBy) {
-    case 'priceAsc':
-      result = [...result].sort((a, b) => a.priceMinor - b.priceMinor);
-      break;
-    case 'priceDesc':
-      result = [...result].sort((a, b) => b.priceMinor - a.priceMinor);
-      break;
-    case 'nameAsc':
-      result = [...result].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
-      break;
-    default:
-      break;
-  }
-
-  return Promise.resolve(result);
+export function fetchProductById(id: number, signal?: AbortSignal): Promise<Product> {
+  return request<Product>('GET', 'product', `/products/${id}`, { signal });
 }

@@ -142,6 +142,42 @@
   color: var(--color-primary-hover);
 }
 
+.errorBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-md);
+  color: var(--color-danger);
+  font-size: 14px;
+}
+
+.errorClose {
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.errorClose:hover {
+  background: color-mix(in srgb, var(--color-danger) 18%, transparent);
+}
+
+.warningBanner {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: color-mix(in srgb, #f59e0b 14%, transparent);
+  border: 1px solid #f59e0b;
+  border-radius: var(--radius-md);
+  color: #92400e;
+  font-size: 14px;
+}
+
 @media (max-width: 900px) {
   .layout {
     grid-template-columns: 1fr;
