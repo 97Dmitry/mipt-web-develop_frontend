@@ -154,3 +154,40 @@ export interface InsufficientStockDetails {
   available: number;
   requested: number;
 }
+
+export interface AdminUser {
+  id: number;
+  login: string;
+  fullName: string;
+  role: 'admin';
+}
+
+export interface AdminLoginResponse {
+  accessToken: string;
+  expiresIn: number;
+  user: AdminUser;
+}
+
+export interface AdminProductImageInput {
+  imageUrl: string;
+  altText?: string;
+  sortOrder?: number;
+}
+
+export interface AdminProductCreateInput {
+  sku: string;
+  name: string;
+  slug?: string;
+  description: string;
+  categoryId: number;
+  price: number;
+  stockQty: number;
+  baseType: BaseType;
+  wattage: number;
+  colorTemperatureK: number;
+  luminousFluxLm: number;
+  isActive: boolean;
+  images: AdminProductImageInput[];
+}
+
+export type AdminProductUpdateInput = Partial<AdminProductCreateInput>;

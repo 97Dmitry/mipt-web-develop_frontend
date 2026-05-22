@@ -39,6 +39,7 @@ interface RequestOptions<TBody> {
   body?: TBody;
   signal?: AbortSignal;
   query?: Record<string, string | number | boolean | undefined | null>;
+  authToken?: string | null;
 }
 
 interface Envelope<T> {
@@ -80,11 +81,18 @@ async function rawRequest<TBody>(
   options?: RequestOptions<TBody>,
 ): Promise<Response> {
   const url = buildUrl(service, path, options?.query);
+  const headers: Record<string, string> = {};
+  if (options?.body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+  }
+  if (options?.authToken) {
+    headers.Authorization = `Bearer ${options.authToken}`;
+  }
   let response: Response;
   try {
     response = await fetch(url, {
       method,
-      headers: options?.body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+      headers: Object.keys(headers).length > 0 ? headers : undefined,
       body: options?.body !== undefined ? JSON.stringify(options.body) : undefined,
       signal: options?.signal,
     });

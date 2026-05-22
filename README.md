@@ -1,6 +1,9 @@
 # Лампочки — frontend интернет-магазина
 
-Учебный проект по курсу веб-разработки (МФТИ, ДЗ №4). Пользовательская часть интернет-магазина светодиодных и других ламп: каталог, карточка товара, корзина, оформление заказа. Состояние управляется через Redux Toolkit, данные приходят с реальных backend-микросервисов.
+Учебный проект по курсу веб-разработки (МФТИ, ДЗ №4 + ДЗ №5). Приложение содержит:
+
+- пользовательскую витрину интернет-магазина (каталог, корзина, checkout);
+- админ-панель с JWT-авторизацией (`/admin/*`) для управления товарами и заказами.
 
 ## Стек
 
@@ -15,8 +18,13 @@
 
 Бэкенд лежит в соседнем репозитории `~/mipt/web-develop` (FastAPI + PostgreSQL):
 
-- **product-service** на `http://localhost:3001` — категории и товары (`/categories`, `/products`, `/products/{id}`).
-- **order-service** на `http://localhost:3002` — гостевая корзина по `sessionId` (`/cart/{sessionId}`, `/cart/{sessionId}/items`, …) и заказы (`/orders`, `/orders/{id}`).
+- **product-service** на `http://localhost:3001`:
+  - storefront: `/public/categories`, `/public/products`, `/public/products/{id}`;
+  - admin (JWT): `/categories`, `/products`, `/products/{id}`, `/products/{id}/stock`.
+- **order-service** на `http://localhost:3002`:
+  - auth: `/auth/login`, `/auth/me`, `/auth/logout`;
+  - storefront: `/cart/{sessionId}/*`, `/orders`, `/orders/{id}`;
+  - admin (JWT): `/admin/orders`, `/admin/orders/{id}`, `/admin/orders/{id}/status`.
 
 Перед запуском frontend подними backend: `cd ~/mipt/web-develop && docker compose up -d`.
 
@@ -36,10 +44,14 @@ src/
 ├── main.tsx, App.tsx          # точка входа, Provider, маршруты, loadCart на mount
 ├── types/domain.ts            # доменные типы (Product, Order, CartItemDto, ...)
 ├── api/
-│   ├── client.ts              # fetch-обёртка, ApiError, env-конфиг
-│   ├── products.ts            # GET /categories, /products, /products/{id}
-│   ├── cart.ts                # GET/POST/PATCH/DELETE /cart/{sessionId}/...
-│   └── orders.ts              # POST /orders, GET /orders/{id}
+│   ├── client.ts              # fetch-обёртка, ApiError, env-конфиг, Bearer token support
+│   ├── products.ts            # storefront GET /public/categories, /public/products, /public/products/{id}
+│   ├── cart.ts                # storefront cart endpoints
+│   ├── orders.ts              # storefront order endpoints
+│   ├── adminAuth.ts           # POST /auth/login, GET /auth/me, POST /auth/logout
+│   ├── adminProducts.ts       # admin products CRUD
+│   └── adminOrders.ts         # admin orders list/status update
+├── admin/                     # AdminAuthProvider, route guard, admin layout
 ├── store/
 │   ├── index.ts, hooks.ts     # configureStore, типизированные useAppDispatch/useAppSelector
 │   └── slices/
@@ -52,7 +64,7 @@ src/
 └── styles/                    # global.css, reset.css
 ```
 
-## Маршруты
+## Маршруты (storefront)
 
 | Путь                    | Страница                |
 |-------------------------|-------------------------|
@@ -62,6 +74,16 @@ src/
 | `/checkout`             | Оформление заказа       |
 | `/orders/:orderId`      | Подтверждение заказа    |
 | `*`                     | 404                     |
+
+## Маршруты (admin)
+
+| Путь                       | Страница                            |
+|---------------------------|-------------------------------------|
+| `/admin/login`            | Вход в админку                      |
+| `/admin/products`         | Список товаров + поиск + удаление   |
+| `/admin/products/new`     | Создание товара                     |
+| `/admin/products/:id/edit`| Редактирование товара               |
+| `/admin/orders`           | Список заказов + смена статуса      |
 
 ## Команды
 
@@ -81,8 +103,10 @@ npm run preview   # запуск собранной версии
 - **Ошибки**: `ApiError` пробрасывается через `rejectWithValue` в slice'ы и оседает в `state.*.error`. Специальная обработка кодов `PRODUCT_NOT_FOUND`, `ORDER_NOT_FOUND`, `INSUFFICIENT_STOCK`, `ADDRESS_REQUIRED`, `EMPTY_CART`.
 - **Дублирующая валидация формы checkout**: клиентская проверка как первый барьер, backend — последняя линия (например, `ADDRESS_REQUIRED` маппится обратно на поле адреса).
 
-## Что не сделано (и почему)
+## Чеклист демонстрации ДЗ5
 
-- **Админ-панель** — вне условия ДЗ.
-- **Авторизация** — клиентская часть гостевая, токены не требуются.
-- **Тесты** — не требуются по ДЗ; функциональность проверяется ручным e2e-обходом.
+1. Вход `/admin/login` (`admin / Admin123!`) и получение JWT.
+2. CRUD-сценарий по товарам в `/admin/products`.
+3. Обновление статуса заказа в `/admin/orders`.
+4. Выход из админки и очистка токена.
+5. В DevTools Network показать `Authorization: Bearer ...` для admin-запросов.

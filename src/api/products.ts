@@ -2,7 +2,7 @@ import type { Category, PageMeta, Product, ProductFiltersQuery } from '../types/
 import { request, requestEnvelope } from './client';
 
 export function fetchCategories(signal?: AbortSignal): Promise<Category[]> {
-  return request<Category[]>('GET', 'product', '/categories', { signal });
+  return request<Category[]>('GET', 'product', '/public/categories', { signal });
 }
 
 export interface ProductsListResult {
@@ -14,7 +14,7 @@ export async function fetchProducts(
   filters: ProductFiltersQuery,
   signal?: AbortSignal,
 ): Promise<ProductsListResult> {
-  const envelope = await requestEnvelope<Product[]>('GET', 'product', '/products', {
+  const envelope = await requestEnvelope<Product[]>('GET', 'product', '/public/products', {
     query: {
       search: filters.search,
       categoryId: filters.categoryId,
@@ -38,5 +38,5 @@ export async function fetchProducts(
 }
 
 export function fetchProductById(id: number, signal?: AbortSignal): Promise<Product> {
-  return request<Product>('GET', 'product', `/products/${id}`, { signal });
+  return request<Product>('GET', 'product', `/public/products/${id}`, { signal });
 }
