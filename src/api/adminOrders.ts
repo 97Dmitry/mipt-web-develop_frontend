@@ -16,6 +16,8 @@ interface OrdersListItem {
 interface ListOrdersQuery {
   search?: string;
   status?: OrderStatus;
+  dateFrom?: string;
+  dateTo?: string;
   page?: number;
   limit?: number;
 }
@@ -32,7 +34,7 @@ export async function listOrders(
   query: ListOrdersQuery,
   signal?: AbortSignal,
 ): Promise<ListResult<OrdersListItem>> {
-  const envelope = await requestEnvelope<OrdersListItem[]>('GET', 'order', '/admin/orders', {
+  const envelope = await requestEnvelope<OrdersListItem[]>('GET', 'admin', '/orders', {
     authToken: token,
     signal,
     query: query as QueryParams,
@@ -46,7 +48,7 @@ export async function listOrders(
 }
 
 export function getOrder(token: string, orderId: number, signal?: AbortSignal): Promise<Order> {
-  return request<Order>('GET', 'order', `/admin/orders/${orderId}`, {
+  return request<Order>('GET', 'admin', `/orders/${orderId}`, {
     authToken: token,
     signal,
   });
@@ -59,7 +61,7 @@ export function updateOrderStatus(
   comment?: string,
   signal?: AbortSignal,
 ): Promise<{ id: number; status: OrderStatus }> {
-  return request<{ id: number; status: OrderStatus }>('PATCH', 'order', `/admin/orders/${orderId}/status`, {
+  return request<{ id: number; status: OrderStatus }>('PATCH', 'admin', `/orders/${orderId}/status`, {
     authToken: token,
     signal,
     body: { status, comment },

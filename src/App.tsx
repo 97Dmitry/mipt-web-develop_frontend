@@ -16,6 +16,8 @@ import { AdminLoginPage } from './pages/admin/AdminLoginPage';
 import { AdminProductsPage } from './pages/admin/AdminProductsPage';
 import { AdminProductFormPage } from './pages/admin/AdminProductFormPage';
 import { AdminOrdersPage } from './pages/admin/AdminOrdersPage';
+import { AdminCategoriesPage } from './pages/admin/AdminCategoriesPage';
+import { AdminOrderDetailPage } from './pages/admin/AdminOrderDetailPage';
 
 export function App() {
   const dispatch = useAppDispatch();
@@ -34,7 +36,9 @@ export function App() {
             <Route path="products" element={<AdminProductsPage />} />
             <Route path="products/new" element={<AdminProductFormPage />} />
             <Route path="products/:id/edit" element={<AdminProductFormPage />} />
+            <Route path="categories" element={<AdminCategoriesPage />} />
             <Route path="orders" element={<AdminOrdersPage />} />
+            <Route path="orders/:id" element={<AdminOrderDetailPage />} />
           </Route>
         </Route>
 

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 
 import * as adminProductsApi from '../../api/adminProducts';
@@ -6,19 +6,31 @@ import { ApiError } from '../../api/client';
 import { useAdminAuth } from '../../admin/useAdminAuth';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { Select } from '../../components/ui/Select';
 import { formatPrice } from '../../utils/format';
-import type { Product } from '../../types/domain';
+import type { Category, Product } from '../../types/domain';
 import styles from './AdminProductsPage.module.css';
+
+type ActiveFilter = 'all' | 'active' | 'inactive';
 
 export function AdminProductsPage() {
   const { token } = useAdminAuth();
   const authToken = token;
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [activeFilter, setActiveFilter] = useState<ActiveFilter>('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [total, setTotal] = useState(0);
+  const [stockDrafts, setStockDrafts] = useState<Record<number, string>>({});
+
+  const categoryOptions = useMemo(
+    () => categories.map((category) => ({ value: String(category.id), label: category.name })),
+    [categories],
+  );
 
   useEffect(() => {
     if (!authToken) return;
@@ -28,10 +40,23 @@ export function AdminProductsPage() {
       setLoading(true);
       setError(null);
       try {
-        const response = await adminProductsApi.listProducts(authToken!, { search, page: 1, limit: 100 });
+        const [productsResponse, loadedCategories] = await Promise.all([
+          adminProductsApi.listProducts(authToken!, {
+            search,
+            categoryId: categoryFilter ? Number(categoryFilter) : undefined,
+            isActive: activeFilter === 'all' ? undefined : activeFilter === 'active',
+            page: 1,
+            limit: 100,
+          }),
+          adminProductsApi.listCategories(authToken!),
+        ]);
         if (!cancelled) {
-          setItems(response.items);
-          setTotal(response.meta.total);
+          setItems(productsResponse.items);
+          setCategories(loadedCategories);
+          setTotal(productsResponse.meta.total);
+          setStockDrafts(
+            Object.fromEntries(productsResponse.items.map((item) => [item.id, String(item.stockQty)])),
+          );
         }
       } catch (err) {
         if (!cancelled) {
@@ -54,7 +79,7 @@ export function AdminProductsPage() {
     return () => {
       cancelled = true;
     };
-  }, [authToken, search]);
+  }, [authToken, search, categoryFilter, activeFilter]);
 
   if (!authToken) {
     return null;
@@ -64,8 +89,14 @@ export function AdminProductsPage() {
     if (!window.confirm('Деактивировать товар?')) return;
     try {
       await adminProductsApi.deleteProduct(authToken!, productId);
-      setItems((prev) => prev.filter((item) => item.id !== productId));
-      setTotal((prev) => Math.max(0, prev - 1));
+      setItems((prev) =>
+        activeFilter === 'active'
+          ? prev.filter((item) => item.id !== productId)
+          : prev.map((item) => (item.id === productId ? { ...item, isActive: false } : item)),
+      );
+      if (activeFilter === 'active') {
+        setTotal((prev) => Math.max(0, prev - 1));
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
@@ -73,6 +104,30 @@ export function AdminProductsPage() {
         setError(err.message);
       } else {
         setError('Не удалось удалить товар');
+      }
+    }
+  }
+
+  async function handleStockUpdate(productId: number) {
+    const nextStock = Number(stockDrafts[productId]);
+    if (!Number.isInteger(nextStock) || nextStock < 0) {
+      setError('Остаток должен быть целым числом не меньше 0');
+      return;
+    }
+
+    try {
+      const response = await adminProductsApi.updateProductStock(authToken!, productId, nextStock);
+      setItems((prev) =>
+        prev.map((item) => (item.id === productId ? { ...item, stockQty: response.stockQty } : item)),
+      );
+      setError(null);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Не удалось обновить остаток');
       }
     }
   }
@@ -94,11 +149,27 @@ export function AdminProductsPage() {
           onChange={(event) => setSearchInput(event.target.value)}
           placeholder="Например, LED"
         />
-        <div>
+        <Select
+          label="Категория"
+          value={categoryFilter}
+          options={categoryOptions}
+          placeholder="Все"
+          onChange={(event) => setCategoryFilter(event.target.value)}
+        />
+        <Select
+          label="Активность"
+          value={activeFilter}
+          options={[
+            { value: 'all', label: 'Все' },
+            { value: 'active', label: 'Активные' },
+            { value: 'inactive', label: 'Неактивные' },
+          ]}
+          onChange={(event) => setActiveFilter(event.target.value as ActiveFilter)}
+        />
+        <div className={styles.toolbarActions}>
           <Button type="submit" variant="secondary" size="sm">
             Найти
           </Button>
-          {' '}
           <Link to="/admin/products/new">Новый товар</Link>
         </div>
       </form>
@@ -113,6 +184,7 @@ export function AdminProductsPage() {
               <th>ID</th>
               <th>SKU</th>
               <th>Название</th>
+              <th>Категория</th>
               <th>Цена</th>
               <th>Остаток</th>
               <th>Активен</th>
@@ -122,7 +194,7 @@ export function AdminProductsPage() {
           <tbody>
             {!loading && items.length === 0 && (
               <tr>
-                <td colSpan={7}>Нет данных</td>
+                <td colSpan={8}>Нет данных</td>
               </tr>
             )}
             {items.map((product) => (
@@ -130,14 +202,29 @@ export function AdminProductsPage() {
                 <td>{product.id}</td>
                 <td>{product.sku}</td>
                 <td>{product.name}</td>
+                <td>{product.category.name}</td>
                 <td>{formatPrice(product.price)}</td>
-                <td>{product.stockQty}</td>
+                <td>
+                  <div className={styles.stockEditor}>
+                    <input
+                      type="number"
+                      min="0"
+                      value={stockDrafts[product.id] ?? String(product.stockQty)}
+                      onChange={(event) =>
+                        setStockDrafts((prev) => ({ ...prev, [product.id]: event.target.value }))
+                      }
+                    />
+                    <button type="button" onClick={() => void handleStockUpdate(product.id)}>
+                      OK
+                    </button>
+                  </div>
+                </td>
                 <td>{product.isActive ? 'Да' : 'Нет'}</td>
                 <td>
                   <div className={styles.actions}>
                     <Link to={`/admin/products/${product.id}/edit`}>Редактировать</Link>
                     <button type="button" onClick={() => void handleDelete(product.id)}>
-                      Удалить
+                      Деактивировать
                     </button>
                   </div>
                 </td>
@@ -145,7 +232,7 @@ export function AdminProductsPage() {
             ))}
             {loading && (
               <tr>
-                <td colSpan={7}>Загрузка...</td>
+                <td colSpan={8}>Загрузка...</td>
               </tr>
             )}
           </tbody>

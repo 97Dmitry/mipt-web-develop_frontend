@@ -191,3 +191,10 @@ export interface AdminProductCreateInput {
 }
 
 export type AdminProductUpdateInput = Partial<AdminProductCreateInput>;
+
+export interface AdminCategoryInput {
+  name: string;
+  slug?: string;
+  sort_order?: number;
+  is_active?: boolean;
+}
