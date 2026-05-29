@@ -1,6 +1,6 @@
 import type { ApiErrorPayload } from '../types/domain';
 
-export type ServiceName = 'product' | 'order';
+export type ServiceName = 'product' | 'order' | 'admin';
 
 export class ApiError extends Error {
   code: string;
@@ -22,9 +22,10 @@ export class ApiError extends Error {
 
 const PRODUCT_BASE = import.meta.env.VITE_PRODUCT_API_URL;
 const ORDER_BASE = import.meta.env.VITE_ORDER_API_URL;
+const ADMIN_BASE = import.meta.env.VITE_ADMIN_API_URL;
 
 function baseUrlFor(service: ServiceName): string {
-  const url = service === 'product' ? PRODUCT_BASE : ORDER_BASE;
+  const url = service === 'product' ? PRODUCT_BASE : service === 'order' ? ORDER_BASE : ADMIN_BASE;
   if (!url) {
     throw new ApiError(
       'CONFIG_ERROR',

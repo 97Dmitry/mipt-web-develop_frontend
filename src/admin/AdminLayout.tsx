@@ -26,6 +26,14 @@ export function AdminLayout() {
               Товары
             </NavLink>
             <NavLink
+              to="/admin/categories"
+              className={({ isActive }) =>
+                [styles.navLink, isActive ? styles.navLinkActive : ''].filter(Boolean).join(' ')
+              }
+            >
+              Категории
+            </NavLink>
+            <NavLink
               to="/admin/orders"
               className={({ isActive }) =>
                 [styles.navLink, isActive ? styles.navLinkActive : ''].filter(Boolean).join(' ')

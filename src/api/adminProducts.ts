@@ -1,4 +1,5 @@
 import type {
+  AdminCategoryInput,
   AdminProductCreateInput,
   AdminProductUpdateInput,
   Category,
@@ -9,6 +10,8 @@ import { request, requestEnvelope } from './client';
 
 interface ProductListQuery {
   search?: string;
+  categoryId?: number;
+  isActive?: boolean;
   page?: number;
   limit?: number;
 }
@@ -25,7 +28,7 @@ export async function listProducts(
   query: ProductListQuery,
   signal?: AbortSignal,
 ): Promise<ListResult<Product>> {
-  const envelope = await requestEnvelope<Product[]>('GET', 'product', '/products', {
+  const envelope = await requestEnvelope<Product[]>('GET', 'admin', '/catalog/products', {
     authToken: token,
     signal,
     query: query as QueryParams,
@@ -39,7 +42,7 @@ export async function listProducts(
 }
 
 export function getProduct(token: string, productId: number, signal?: AbortSignal): Promise<Product> {
-  return request<Product>('GET', 'product', `/products/${productId}`, {
+  return request<Product>('GET', 'admin', `/catalog/products/${productId}`, {
     authToken: token,
     signal,
   });
@@ -50,7 +53,7 @@ export function createProduct(
   input: AdminProductCreateInput,
   signal?: AbortSignal,
 ): Promise<Product> {
-  return request<Product>('POST', 'product', '/products', {
+  return request<Product>('POST', 'admin', '/catalog/products', {
     authToken: token,
     body: input,
     signal,
@@ -63,7 +66,7 @@ export function updateProduct(
   input: AdminProductUpdateInput,
   signal?: AbortSignal,
 ): Promise<Product> {
-  return request<Product>('PATCH', 'product', `/products/${productId}`, {
+  return request<Product>('PATCH', 'admin', `/catalog/products/${productId}`, {
     authToken: token,
     body: input,
     signal,
@@ -71,14 +74,59 @@ export function updateProduct(
 }
 
 export function deleteProduct(token: string, productId: number, signal?: AbortSignal): Promise<void> {
-  return request<void>('DELETE', 'product', `/products/${productId}`, {
+  return request<void>('DELETE', 'admin', `/catalog/products/${productId}`, {
     authToken: token,
     signal,
   });
 }
 
+export function updateProductStock(
+  token: string,
+  productId: number,
+  stockQty: number,
+  signal?: AbortSignal,
+): Promise<{ id: number; stockQty: number }> {
+  return request<{ id: number; stockQty: number }>('PATCH', 'admin', `/catalog/products/${productId}/stock`, {
+    authToken: token,
+    body: { stockQty },
+    signal,
+  });
+}
+
 export function listCategories(token: string, signal?: AbortSignal): Promise<Category[]> {
-  return request<Category[]>('GET', 'product', '/categories', {
+  return request<Category[]>('GET', 'admin', '/catalog/categories', {
+    authToken: token,
+    signal,
+  });
+}
+
+export function createCategory(
+  token: string,
+  input: AdminCategoryInput,
+  signal?: AbortSignal,
+): Promise<Category> {
+  return request<Category>('POST', 'admin', '/catalog/categories', {
+    authToken: token,
+    body: input,
+    signal,
+  });
+}
+
+export function updateCategory(
+  token: string,
+  categoryId: number,
+  input: AdminCategoryInput,
+  signal?: AbortSignal,
+): Promise<Category> {
+  return request<Category>('PATCH', 'admin', `/catalog/categories/${categoryId}`, {
+    authToken: token,
+    body: input,
+    signal,
+  });
+}
+
+export function deleteCategory(token: string, categoryId: number, signal?: AbortSignal): Promise<void> {
+  return request<void>('DELETE', 'admin', `/catalog/categories/${categoryId}`, {
     authToken: token,
     signal,
   });
